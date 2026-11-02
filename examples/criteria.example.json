@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "title": "Example full-text eligibility criteria",
+  "core_rule": "Include a report only when every inclusion criterion is met and no exclusion criterion is triggered.",
+  "inclusion_rule": "Missing information is unclear, not automatically ineligible.",
+  "exclusion_rule": "Use the first clearly supported exclusion reason in the order shown.",
+  "if_uncertain": "Choose Maybe and resolve the item through reviewer discussion.",
+  "guidance": "Replace every example below with the protocol-approved criteria for your own review.",
+  "inclusion": [
+    {
+      "id": "I1",
+      "name": "Target population",
+      "definition": "The study includes the population defined in the review protocol.",
+      "exclusion_code": "E1"
+    },
+    {
+      "id": "I2",
+      "name": "Eligible study design",
+      "definition": "The report presents an eligible primary research design.",
+      "sub_requirements": [
+        {
+          "id": "I2.1",
+          "text": "The report describes original data collection or analysis.",
+          "kind": "all_required"
+        },
+        {
+          "id": "I2.2",
+          "text": "The methods and results are reported in enough detail for screening.",
+          "kind": "all_required"
+        }
+      ],
+      "exclusion_code": "E2"
+    }
+  ],
+  "exclusion": [
+    {
+      "id": "E1",
+      "name": "Wrong population",
+      "definition": "The study population is entirely outside the population defined in the review protocol.",
+      "paired_inclusion": "I1"
+    },
+    {
+      "id": "E2",
+      "name": "Ineligible publication or design",
+      "definition": "The item is an editorial, protocol without results, commentary, or another design excluded by the protocol.",
+      "paired_inclusion": "I2"
+    }
+  ],
+  "unretrieved": [
+    {
+      "id": "U1",
+      "name": "Full text not retrieved",
+      "definition": "The full text could not be obtained after the review team's retrieval process."
+    }
+  ]
+}

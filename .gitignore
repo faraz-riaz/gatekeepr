@@ -1,0 +1,48 @@
+# Secrets and machine-specific configuration
+.env*
+!.env.example
+*.pem
+*.key
+*.credentials.json
+
+# User review inputs (may contain copyrighted or sensitive material)
+papers.csv
+criteria.json
+*.pdf
+pdfs/*
+!pdfs/.gitkeep
+data/*
+!data/.gitkeep
+
+# Runtime databases, backups, and exports
+storage/
+app/storage/
+*.db
+*.db-shm
+*.db-wal
+screening_backup_*.json
+screening_results_*.csv
+
+# Python
+app/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend build/install output
+app/frontend/node_modules/
+app/frontend/dist/
+app/frontend/public/pdfjs/
+npm-debug.log*
+*.tsbuildinfo
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp

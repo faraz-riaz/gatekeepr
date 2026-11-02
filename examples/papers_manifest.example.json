@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "papers": [
+    {
+      "paper_id": "DEMO001",
+      "title": "Replace this row with a paper from your review",
+      "pdf_path": "pdfs/DEMO001.pdf",
+      "access_status": "not_retrieved",
+      "notes": "The manifest is optional. Without it, name each PDF <Paper_ID>.pdf."
+    }
+  ]
+}
