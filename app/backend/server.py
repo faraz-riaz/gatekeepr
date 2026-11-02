@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Full-Text Screening", lifespan=lifespan)
+app = FastAPI(title="GateKeepr", lifespan=lifespan)
 
 
 def _paper_or_404(paper_id: str) -> dict[str, Any]:

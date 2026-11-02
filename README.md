@@ -1,6 +1,6 @@
-# Full-Text Screening
+# GateKeepr
 
-A local-first web application for evidence-based full-text screening in literature reviews. Reviewers can read PDFs, annotate passages, assess configurable inclusion and exclusion criteria, record decisions, and optionally request advisory AI analysis.
+**GateKeepr** is a local-first web application for evidence-based full-text screening in literature reviews. Reviewers can read PDFs, annotate passages, assess configurable inclusion and exclusion criteria, record decisions, and optionally request advisory AI analysis.
 
 The application is review-agnostic. Your criteria, paper list, PDFs, API credentials, and screening database are local inputs and are intentionally excluded from Git.
 
@@ -45,8 +45,8 @@ Requirements: Python 3.10 or newer. The setup script can install a bundled Node.
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/faraz-riaz/full-text-screening.git
-cd full-text-screening
+git clone https://github.com/faraz-riaz/gatekeepr.git
+cd gatekeepr
 Copy-Item .env.example .env
 .\app\start.bat
 ```
@@ -54,8 +54,8 @@ Copy-Item .env.example .env
 macOS or Linux:
 
 ```bash
-git clone https://github.com/faraz-riaz/full-text-screening.git
-cd full-text-screening
+git clone https://github.com/faraz-riaz/gatekeepr.git
+cd gatekeepr
 cp .env.example .env
 chmod +x app/start.sh
 ./app/start.sh

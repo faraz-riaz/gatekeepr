@@ -1,5 +1,5 @@
 @echo off
-rem Full-Text Screening - one-click start (Windows)
+rem GateKeepr - one-click start (Windows)
 setlocal
 cd /d "%~dp0"
 
@@ -32,7 +32,7 @@ if not exist "frontend\dist\index.html" (
 
 if "%SCREENING_PORT%"=="" set "SCREENING_PORT=8765"
 echo.
-echo  Full-Text Screening is starting on http://127.0.0.1:%SCREENING_PORT%
+echo  GateKeepr is starting on http://127.0.0.1:%SCREENING_PORT%
 echo  Press Ctrl+C to stop.
 echo.
 if not defined SCREENING_NO_BROWSER start "" cmd /c "timeout /t 3 >nul & start http://127.0.0.1:%SCREENING_PORT%"

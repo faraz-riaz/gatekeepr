@@ -41,7 +41,7 @@ export function TopBar({ onOpen }: { onOpen: (d: "criteria" | "shortcuts" | "set
       <div className="flex min-w-0 items-center gap-2.5">
         <img src="/favicon.svg" alt="" className="h-7 w-7" />
         <div className="min-w-0 leading-tight">
-          <div className="text-[13.5px] font-semibold tracking-tight">Full-Text Screening</div>
+          <div className="text-[13.5px] font-semibold tracking-tight">GateKeepr</div>
           <div className="truncate text-[11px] text-ink-3">{criteria ? criteria.title.split("—").pop()?.trim() : "Scoping review"}</div>
         </div>
       </div>

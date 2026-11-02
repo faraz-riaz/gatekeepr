@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full-Text Screening - start script (macOS / Linux)
+# GateKeepr - start script (macOS / Linux)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,7 +24,7 @@ if [ ! -f frontend/dist/index.html ]; then
 fi
 PORT="${SCREENING_PORT:-8765}"
 echo
-echo " Full-Text Screening is starting on http://127.0.0.1:${PORT}  (Ctrl+C to stop)"
+echo " GateKeepr is starting on http://127.0.0.1:${PORT}  (Ctrl+C to stop)"
 echo
 ( sleep 3; (command -v open >/dev/null && open "http://127.0.0.1:${PORT}") || (command -v xdg-open >/dev/null && xdg-open "http://127.0.0.1:${PORT}") || true ) &
 exec .venv/bin/python -m backend.server
