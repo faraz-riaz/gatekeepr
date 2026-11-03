@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/frontend/public/favicon.svg" alt="GateKeepr icon" width="88" height="88">
+</p>
+
 # GateKeepr
 
 **GateKeepr** is a local-first web application for evidence-based full-text screening in literature reviews. Reviewers can read PDFs, annotate passages, assess configurable inclusion and exclusion criteria, record decisions, and optionally request advisory AI analysis.
