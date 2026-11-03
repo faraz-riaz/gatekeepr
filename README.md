@@ -204,6 +204,8 @@ OPENAI_MODEL=your-supported-model
 
 Credentials are read only by the backend and are never returned to the browser. Use **Settings → Test connection** after changing provider configuration. Restart the server after editing `.env`.
 
+When the configured provider or model changes, GateKeepr marks existing AI analyses as potentially outdated. Use **Analyse all** to re-run every paper with a local PDF; reviewer decisions and notes are preserved.
+
 ## How AI analysis is constrained
 
 1. The complete criteria text and extracted paper text are sent to the configured provider.

@@ -292,6 +292,14 @@ def test_analysis_pipeline_rejects_unverified_output(client: TestClient):
         assert analysis["result"]["assessments"]["I3"]["route"] == "I3B"
         assert analysis["recommendation"]["decision"] == "include"
         assert analysis["result"]["study_characteristics"][0]["label"] == "Design"
+
+        replacement = FakeProvider(FAKE_ANALYSIS)
+        replacement.model = "fake-2"
+        server.svc.provider = replacement
+        papers = client.get("/api/papers").json()
+        assert papers[0]["analysis_state"] == "outdated"
+        detail = client.get("/api/papers/P001").json()
+        assert "provider or model has changed" in detail["analysis"]["outdated_reason"]
     finally:
         server.svc.provider, server.svc.provider_status = None, "disabled"
 

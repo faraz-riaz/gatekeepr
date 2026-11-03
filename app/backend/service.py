@@ -233,6 +233,8 @@ class Services:
 
     def _outdated_reason(self, a: dict[str, Any], p: dict[str, Any]) -> str | None:
         reasons = []
+        if self.provider and (a.get("provider") != self.provider.name or a.get("model") != self.provider.model):
+            reasons.append("the AI provider or model has changed")
         ch = self.criteria_hash()
         if ch and a["criteria_hash"] != ch:
             reasons.append("the eligibility criteria have changed")
