@@ -854,7 +854,7 @@ export function MissingPdf({ detail }: { detail: PaperDetail }) {
         )}
         <p className="mt-4 text-[12px] text-ink-3">
           If the full text cannot be obtained, you can record the paper as <span className="font-medium text-ink-2">U1 — Not retrieved</span> using the decision
-          panel. After adding a PDF to <span className="font-mono">pdfs/</span> and updating the manifest, use “Re-sync sources”.
+          panel. After adding a PDF named <span className="font-mono">&lt;Paper_ID&gt;.pdf</span> to <span className="font-mono">pdfs/</span>, use “Re-sync sources”.
         </p>
       </div>
     </div>

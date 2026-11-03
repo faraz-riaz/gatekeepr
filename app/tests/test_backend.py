@@ -256,6 +256,22 @@ def test_papers_sync_and_pdf_serving(client: TestClient):
     assert response.status_code == 200 and response.content[:4] == b"%PDF"
     assert client.get("/api/papers/P002/pdf").status_code == 404
 
+    # Reviewers can add a conventionally named PDF after acquisition, even when
+    # the existing manifest entry has no pdf_path and still says not retrieved.
+    manual_pdf = PDF_DIR / "P002.pdf"
+    _make_pdf(manual_pdf)
+    try:
+        sync = client.post("/api/sync")
+        assert sync.status_code == 200
+        assert sync.json()["with_pdf"] == 2
+        papers = client.get("/api/papers").json()
+        assert papers[1]["pdf_available"] is True
+        response = client.get("/api/papers/P002/pdf")
+        assert response.status_code == 200 and response.content[:4] == b"%PDF"
+    finally:
+        manual_pdf.unlink(missing_ok=True)
+        client.post("/api/sync")
+
 
 def test_analysis_pipeline_rejects_unverified_output(client: TestClient):
     fake = FakeProvider(FAKE_ANALYSIS)

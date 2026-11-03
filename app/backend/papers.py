@@ -85,10 +85,14 @@ def sync_papers(db: Database, settings: Settings) -> dict[str, int]:
             if m.get("pdf_path"):
                 p = Path(m["pdf_path"])
                 pdf_path = p if p.is_absolute() else settings.root / p
-            elif not m:
-                # No manifest entry at all: accept only a file named exactly after this paper's ID.
-                candidate = settings.pdf_dir / f"{pid}.pdf"
-                pdf_path = candidate if candidate.exists() else None
+            # A manually added, conventionally named PDF is valid even when an older
+            # manifest entry exists without pdf_path (for example, after a reviewer
+            # obtains a formerly paywalled paper). It also acts as a fallback when a
+            # stale manifest path no longer exists. Explicit, valid manifest paths
+            # still take precedence so duplicates and custom locations keep working.
+            candidate = settings.pdf_dir / f"{pid}.pdf"
+            if (pdf_path is None or not pdf_path.is_file()) and candidate.is_file():
+                pdf_path = candidate
             exists = bool(pdf_path and pdf_path.is_file())
             pdf_sha = None
             checksum_ok = None
