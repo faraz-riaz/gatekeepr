@@ -3,14 +3,13 @@ import { BookOpen, Database, FileDown, Keyboard, Monitor, Moon, Settings, Sparkl
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { api } from "../api";
-import { useCriteria, usePapers, useStatus } from "../hooks";
+import { usePapers, useStatus } from "../hooks";
 import { useUi } from "../store";
 import { Button, IconButton, Menu, MenuItem, MenuSeparator, Spinner, Tip } from "./ui";
 
 export function TopBar({ onOpen }: { onOpen: (d: "criteria" | "shortcuts" | "settings") => void }) {
   const { data: papers } = usePapers();
   const { data: status } = useStatus();
-  const { data: criteria } = useCriteria();
   const theme = useUi((s) => s.theme);
   const set = useUi((s) => s.set);
   const qc = useQueryClient();
@@ -42,7 +41,7 @@ export function TopBar({ onOpen }: { onOpen: (d: "criteria" | "shortcuts" | "set
         <img src="/favicon.svg" alt="" className="h-7 w-7" />
         <div className="min-w-0 leading-tight">
           <div className="text-[13.5px] font-semibold tracking-tight">GateKeepr</div>
-          <div className="truncate text-[11px] text-ink-3">{criteria ? criteria.title.split("—").pop()?.trim() : "Scoping review"}</div>
+          <div className="truncate text-[11px] text-ink-3">Full-text review workspace</div>
         </div>
       </div>
 

@@ -82,16 +82,6 @@ export interface Recommendation {
   agrees_with_model: boolean | null;
 }
 
-export interface LegacyInputProfile {
-  leads: string;
-  sampling_rate: string;
-  duration: string;
-  source_heterogeneity: string;
-  processing: string;
-  model_accepts: string;
-  compatibility_method: string;
-}
-
 export interface StudyCharacteristic {
   label: string;
   value: string;
@@ -106,9 +96,6 @@ export interface Analysis {
   result: {
     study_summary: string;
     study_characteristics?: StudyCharacteristic[];
-    /** Present only in analyses created by the original review-specific schema. */
-    contribution_type?: string;
-    input_profile?: LegacyInputProfile;
     assessments: Record<string, Assessment>;
     model_rationale: string;
     model_decision: Decision;

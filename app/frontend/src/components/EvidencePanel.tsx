@@ -229,19 +229,7 @@ function RecommendationCard({ a, onReanalyze, running }: { a: Analysis; onReanal
   const t = decisionTone[rec.decision];
   const [showProfile, setShowProfile] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
-  const legacy = a.result.input_profile;
-  const characteristics =
-    a.result.study_characteristics ??
-    (legacy
-      ? [
-          { label: "Leads", value: legacy.leads },
-          { label: "Sampling rate", value: legacy.sampling_rate },
-          { label: "Duration", value: legacy.duration },
-          { label: "Source data", value: legacy.source_heterogeneity },
-          { label: "Processing", value: legacy.processing },
-          { label: "Model accepts", value: legacy.model_accepts },
-        ]
-      : []);
+  const characteristics = a.result.study_characteristics ?? [];
   return (
     <div className={cx("overflow-hidden rounded-xl border bg-surface", rec.decision === "include" ? "border-emerald-200 dark:border-emerald-500/25" : rec.decision === "exclude" ? "border-rose-200 dark:border-rose-500/25" : "border-amber-200 dark:border-amber-500/25")}>
       <div className={cx("px-3.5 pb-3 pt-3", t.soft)}>
