@@ -10,13 +10,14 @@ The application is review-agnostic. Your criteria, paper list, PDFs, API credent
 
 ## Features
 
-- PDF reader with search, zoom, keyboard navigation, and persistent evidence highlights
+- PDF reader with search, zoom (opens at *Fit page*), keyboard navigation, and persistent evidence highlights
 - Configurable inclusion and exclusion criteria
 - Manual Include, Exclude, and Maybe decisions with notes and decision history
 - Optional Gemini or OpenAI analysis with structured outputs
 - Verification of every AI quotation against the extracted PDF text
 - Data extraction for included papers with user-defined templates (single and repeatable groups, typed fields, linked records)
 - Every extracted value linked to highlighted source passages in the PDF; unverifiable evidence is flagged, never hidden
+- Researcher control: AI values stay suggestions until accepted, edited or rejected, and re-runs never overwrite reviewed work
 - Relational CSV (ZIP) and JSON export of extracted data, plus provenance
 - CSV export and JSON backup/restore
 - Local SQLite storage; no hosted service is required
@@ -39,9 +40,15 @@ Criteria are loaded from the review's `criteria.json` file and shown verbatim in
 
 ![Eligibility criteria dialog populated from a synthetic criteria file](docs/screenshots/eligibility-criteria.png)
 
+### Extract data with every value linked to its source
+
+Included papers move on to data extraction. Values extracted with your template are listed beside the PDF; clicking one jumps to its highlighted source passage, and AI suggestions stay pending until you accept, edit or reject them.
+
+![Data extraction workspace with a synthetic paper: extracted values beside the PDF and the selected value's source passage highlighted](docs/screenshots/data-extraction.png)
+
 ### Work quickly with keyboard shortcuts
 
-Shortcuts cover screening decisions, paper navigation, PDF search and zoom, panel controls, and evidence-highlight navigation.
+Shortcuts cover screening decisions, paper navigation, PDF search and zoom, panel controls, evidence-highlight navigation, and accepting extracted values (`Y`).
 
 ![Keyboard shortcut reference for screening, navigation, and PDF highlights](docs/screenshots/keyboard-shortcuts.png)
 
@@ -247,10 +254,11 @@ Templates are saved as immutable versions. Data is stored by group and field ID,
 ### 2. Extract and verify
 
 - **Run AI extraction** for one paper or use **Extract all**. The model receives the template and the full text and returns every value with a status: *reported*, *not reported*, *unclear* or *not applicable*. It also returns the unit, the context needed to interpret numbers (subgroup, dataset, model, metric, setting, table row and column) and verbatim source quotes.
-- Every quote is located in the PDF with the same matcher used for screening evidence. Verified passages are highlighted in violet and keep the exact PDF text.
+- Every quote is located in the PDF with the same matcher used for screening evidence. Verified passages get a **yellow highlighter** mark and keep the exact PDF text.
 - Quotes that cannot be found stay visible as **unverified** and are never highlighted.
-- For numbers, the value must also appear in its cited passage. Otherwise the highlight turns amber and the value is flagged; this catches values read from the wrong table row or column.
-- Click any field to jump to its highlighted passage. Clicking a highlight reveals the field.
+- For numbers, the value must also appear in its cited passage. Otherwise the passage gets a **rose dashed underline** and the value is flagged; this catches values read from the wrong table row or column.
+- Click any field to jump to its highlighted passage; clicking a highlight selects its field. The selected field's passage is emphasised and other passages fade. The crosshair button in the PDF toolbar shows only the selected field's passages.
+- When several values cite the same sentence or table row, they share one highlight, and its tooltip lists every linked value.
 
 ### 3. Review and finalise
 
@@ -258,6 +266,8 @@ AI values are **suggestions** until a reviewer acts on them:
 
 - **Accept** (or press `Y` and move to the next suggestion), **Edit** with type validation, **Reject**, or mark *Not reported*, *Unclear* or *Not applicable*.
 - **Accept verified** bulk-accepts only suggestions whose evidence is verified, contains the value and has no issues.
+- **Accept all** accepts every remaining suggestion for the paper. It first shows how many lack a verified source, and can be undone from the confirmation toast.
+- Filter the form to **All fields**, **To review** or **Issues**, and use the section chips at the top of the panel to jump between groups. Long lists of records collapse to one-line summaries.
 - Add, rename and remove records in repeatable groups, and attach, remove or restore evidence by selecting text in the PDF.
 - Add notes per field and per paper.
 - Mark the paper's extraction **complete**. You are warned about unreviewed suggestions or missing required fields.
