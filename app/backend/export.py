@@ -113,13 +113,18 @@ def export_csv(svc: Services) -> str:
 
 # ---------------------------------------------------------------- backup / restore
 
-BACKUP_TABLES = ("decisions", "decision_log", "notes", "evidence", "analyses")
+BACKUP_TABLES = ("decisions", "decision_log", "notes", "evidence", "analyses",
+                 "extraction_templates", "extraction_papers", "extraction_records", "extraction_values",
+                 "extraction_evidence", "extraction_runs")
+# Extraction rows are merged by primary key; the newer updated_at wins.
+EXTRACTION_MERGE_KEYS = {"extraction_papers": "paper_id", "extraction_records": "id",
+                         "extraction_values": "id", "extraction_evidence": "id"}
 
 
 def backup(db: Database) -> dict[str, Any]:
     return {
         "format": "screening-backup",
-        "version": 1,
+        "version": 2,  # v2 adds extraction tables; v1 backups remain restorable
         "created_at": now_iso(),
         "tables": {t: db.all(f"SELECT * FROM {t}") for t in BACKUP_TABLES},
     }
@@ -129,13 +134,19 @@ def restore(db: Database, data: dict[str, Any], mode: str = "merge") -> dict[str
     """Restore reviewer data. mode='merge' keeps newer local decisions/notes; 'replace' overwrites everything."""
     if data.get("format") != "screening-backup":
         raise ValueError("Not a screening backup file")
+    if data.get("version", 1) not in (1, 2):
+        raise ValueError(f"Unsupported backup version {data.get('version')}")
     tables = data.get("tables", {})
     counts: dict[str, int] = {}
     with db.tx() as conn:
         if mode == "replace":
             for t in BACKUP_TABLES:
+                if t.startswith("extraction_") and t not in tables:
+                    continue  # a v1 backup has no extraction data: keep the local extraction work
                 conn.execute(f"DELETE FROM {t}")
         for t in BACKUP_TABLES:
+            if t not in tables:
+                continue
             rows = tables.get(t, [])
             cols_avail = {r[1] for r in conn.execute(f"PRAGMA table_info({t})")}
             n = 0
@@ -152,6 +163,16 @@ def restore(db: Database, data: dict[str, Any], mode: str = "merge") -> dict[str
                     # AI evidence belongs to a specific analysis; in merge mode only carry over dismissals.
                     conn.execute("UPDATE evidence SET dismissed=? WHERE id=?", (r.get("dismissed", 0), r.get("id")))
                     continue
+                if mode == "merge" and t in EXTRACTION_MERGE_KEYS:
+                    key = EXTRACTION_MERGE_KEYS[t]
+                    cur = conn.execute(f"SELECT updated_at FROM {t} WHERE {key}=?", (r.get(key),)).fetchone()
+                    if cur and (cur[0] or "") >= (r.get("updated_at") or ""):
+                        continue
+                if mode == "merge" and t == "extraction_templates":
+                    if conn.execute("SELECT 1 FROM extraction_templates WHERE version=?", (r.get("version"),)).fetchone():
+                        continue  # template versions are immutable; never overwrite a local version
+                if mode == "merge" and t == "extraction_runs":
+                    continue  # run history is restored only in replace mode
                 if mode == "merge" and t in ("decision_log", "analyses"):
                     r.pop("id", None)
                     if t == "decision_log":

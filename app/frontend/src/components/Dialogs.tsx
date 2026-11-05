@@ -18,6 +18,14 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
       ],
     ],
     [
+      "Data extraction",
+      [
+        [["Y"], "Accept selected field, go to next suggestion"],
+        [["N"], "Next paper to extract"],
+        [["J"], "Next / K previous included paper"],
+      ],
+    ],
+    [
       "Navigation",
       [
         [["J"], "Next paper"],
@@ -40,7 +48,7 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
         [["Ctrl", "F"], "Search within the PDF"],
         [["+"], "Zoom in"],
         [["−"], "Zoom out"],
-        [["0"], "Fit width"],
+        [["0"], "Fit page (default zoom)"],
         [["?"], "Show this help"],
       ],
     ],

@@ -13,14 +13,14 @@ import {
   TriangleAlert,
   Unplug,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { useAnalyze, useInvalidatePaper, usePaper, useStatus } from "../hooks";
 import { cx, DECISION_LABEL, decisionTone, fmtDateTime, relTime } from "../lib/format";
 import { useUi } from "../store";
 import type { Analysis, Decision, PaperDetail } from "../types";
 import { CriteriaSection, EvidenceByPage } from "./CriteriaView";
+import { AutosaveNotes } from "./AutosaveNotes";
 import { DecisionBar } from "./DecisionBar";
 import { Button, IconButton, Segmented, Spinner, Tip } from "./ui";
 
@@ -320,74 +320,16 @@ function RecommendationCard({ a, onReanalyze, running }: { a: Analysis; onReanal
 }
 
 function NotesBox({ detail }: { detail: PaperDetail }) {
-  // Mounted once per paper (keyed by paper ID); refetches never overwrite what the reviewer is typing.
   const id = detail.paper.paper_id;
   const invalidate = useInvalidatePaper();
-  const [value, setValue] = useState(detail.notes?.body ?? "");
-  const [state, setState] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
-  const lastSaved = useRef(detail.notes?.body ?? "");
-  const pending = useRef<string | null>(null);
-  const timer = useRef<number | undefined>(undefined);
-
-  const save = async (body: string) => {
-    window.clearTimeout(timer.current);
-    pending.current = null;
-    if (body === lastSaved.current) {
-      setState((s) => (s === "dirty" ? "saved" : s));
-      return;
-    }
-    setState("saving");
-    try {
-      await api.setNotes(id, body);
-      lastSaved.current = body;
-      setState("saved");
-      invalidate(id);
-    } catch (e) {
-      pending.current = body;
-      setState("dirty");
-      toast.error(`Notes not saved: ${(e as Error).message}`);
-    }
-  };
-
-  // flush unsaved edits when switching to another paper
-  useEffect(
-    () => () => {
-      window.clearTimeout(timer.current);
-      if (pending.current !== null && pending.current !== lastSaved.current) {
-        api.setNotes(id, pending.current).then(() => invalidate(id), (e) => toast.error(`Notes not saved: ${e.message}`));
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const onChange = (v: string) => {
-    setValue(v);
-    setState("dirty");
-    pending.current = v;
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => save(v), 700);
-  };
-
   return (
-    <section>
-      <div className="flex items-center justify-between px-1 pb-2">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Reviewer notes</h3>
-        <span className="text-[11px] text-ink-3">
-          {state === "saving" && "Saving…"}
-          {state === "saved" && "Saved"}
-          {state === "dirty" && "Unsaved"}
-          {state === "idle" && detail.notes?.updated_at && `Updated ${relTime(detail.notes.updated_at)}`}
-        </span>
-      </div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => pending.current !== null && save(value)}
-        rows={4}
-        placeholder="Interpretations, concerns, uncertainties, sections to re-check…"
-        className="w-full resize-y rounded-xl border border-line bg-surface px-3 py-2 text-[13px] leading-relaxed text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
-      />
-    </section>
+    <AutosaveNotes
+      title="Reviewer notes"
+      initial={detail.notes?.body ?? ""}
+      updatedAt={detail.notes?.updated_at}
+      placeholder="Interpretations, concerns, uncertainties, sections to re-check…"
+      save={(body) => api.setNotes(id, body)}
+      onSaved={() => invalidate(id)}
+    />
   );
 }

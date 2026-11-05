@@ -11,11 +11,12 @@ if [ ! -x .venv/bin/python ]; then
   echo "[setup] Creating Python virtual environment..."
   python3 -m venv .venv
 fi
-if [ ! -f .venv/.deps-installed ]; then
+# reinstall whenever requirements.txt changes (the marker is a copy of the installed requirements)
+if ! cmp -s requirements.txt .venv/.deps-installed; then
   echo "[setup] Installing Python dependencies..."
   .venv/bin/python -m pip install -q --upgrade pip
   .venv/bin/python -m pip install -q -r requirements.txt
-  touch .venv/.deps-installed
+  cp requirements.txt .venv/.deps-installed
 fi
 command -v node >/dev/null 2>&1 || export PATH="$PWD/.venv/bin:$PATH"
 if [ ! -f frontend/dist/index.html ]; then

@@ -12,11 +12,13 @@ if not exist ".venv\Scripts\python.exe" (
   echo [setup] Creating Python virtual environment...
   python -m venv .venv || goto :error
 )
-if not exist ".venv\.deps-installed" (
+rem Reinstall whenever requirements.txt changes (the marker is a copy of the installed requirements)
+fc /b requirements.txt ".venv\.deps-installed" >nul 2>&1
+if errorlevel 1 (
   echo [setup] Installing Python dependencies...
   ".venv\Scripts\python.exe" -m pip install -q --upgrade pip
   ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt || goto :error
-  echo ok> ".venv\.deps-installed"
+  copy /y requirements.txt ".venv\.deps-installed" >nul
 )
 
 rem Use system Node.js if present, otherwise the Node bundled in the venv (nodejs-wheel)

@@ -241,3 +241,46 @@ body {
 .indeterminate {
   animation: indeterminate 1.3s ease-in-out infinite;
 }
+
+/* ------------------------------------------------------------------ extraction-stage evidence
+   Highlighter-yellow sources keep dark text readable (distinct from screening colours and from the
+   blue pdf.js search matches). Passages unrelated to the selected field fade; a value that does not
+   occur in its passage gets a rose dashed underline. */
+.hl.extract {
+  background: rgb(253 224 71 / 0.45);
+  box-shadow: inset 0 -1.5px 0 rgb(202 138 4 / 0.55);
+}
+.hl.hover.extract {
+  background: rgb(250 204 21 / 0.6);
+}
+.hl.extract.faint {
+  background: rgb(253 224 71 / 0.16);
+  box-shadow: none;
+}
+/* the selected passage: brighter marker plus an accent underline (an outline would cut through
+   the descenders of the line above in tightly set text) */
+.hl.active.extract,
+.hl.active.mismatch {
+  outline: none;
+  mix-blend-mode: multiply;
+  animation: none;
+}
+.hl.active.extract {
+  background: rgb(250 204 21 / 0.62);
+  box-shadow: inset 0 -2.5px 0 var(--accent);
+}
+.hl.mismatch {
+  background: rgb(251 113 133 / 0.16);
+  border-bottom: 2px dashed rgb(225 29 72 / 0.8);
+}
+.hl.hover.mismatch {
+  background: rgb(251 113 133 / 0.3);
+}
+.hl.mismatch.faint {
+  background: transparent;
+  border-bottom-color: rgb(225 29 72 / 0.35);
+}
+.hl.active.mismatch {
+  background: rgb(251 113 133 / 0.32);
+  border-bottom-style: solid;
+}

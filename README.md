@@ -4,7 +4,7 @@
 
 # GateKeepr
 
-**GateKeepr** is a local-first web application for evidence-based full-text screening in literature reviews. Reviewers can read PDFs, annotate passages, assess configurable inclusion and exclusion criteria, record decisions, and optionally request advisory AI analysis.
+**GateKeepr** is a local-first web application for evidence-based full-text screening and data extraction in literature reviews. Reviewers can read PDFs, annotate passages, assess configurable inclusion and exclusion criteria, record decisions, extract structured data from included papers with every value linked to its source passage, and optionally request advisory AI assistance.
 
 The application is review-agnostic. Your criteria, paper list, PDFs, API credentials, and screening database are local inputs and are intentionally excluded from Git.
 
@@ -15,6 +15,9 @@ The application is review-agnostic. Your criteria, paper list, PDFs, API credent
 - Manual Include, Exclude, and Maybe decisions with notes and decision history
 - Optional Gemini or OpenAI analysis with structured outputs
 - Verification of every AI quotation against the extracted PDF text
+- Data extraction for included papers with user-defined templates (single and repeatable groups, typed fields, linked records)
+- Every extracted value linked to highlighted source passages in the PDF; unverifiable evidence is flagged, never hidden
+- Relational CSV (ZIP) and JSON export of extracted data, plus provenance
 - CSV export and JSON backup/restore
 - Local SQLite storage; no hosted service is required
 
@@ -218,9 +221,74 @@ Quotation verification proves that a passage exists in the PDF; it does not prov
 
 Scanned PDFs require a searchable text layer. If Tesseract OCR and `TESSDATA_PREFIX` are available, the backend attempts OCR; otherwise image-only PDFs cannot be analysed or text-highlighted.
 
+## Data extraction
+
+Extraction is the second stage, after screening (switch stages in the top bar). Only papers whose **current** human screening decision is **Include** are available. If a decision changes later, the paper's extraction data is kept and listed under *No longer included*; it is excluded from exports by default and reappears if the paper is included again.
+
+### 1. Define the extraction template
+
+Open **Extraction template** (top bar) and import a file, load the example, or build the form in the editor. A template is a list of **groups** of typed **fields**:
+
+- **Single groups** have one record per paper (e.g. study characteristics, population).
+- **Repeatable groups** have any number of records per paper (e.g. datasets, models, arms, outcomes, results). Each entity the paper reports becomes its own record; nothing is merged.
+- **Field types**: text, long text, number, whole number, single choice, multiple choice, date, yes/no, and **link to record**. Link fields express relationships between repeated records, e.g. a result row linked to the model and dataset it belongs to.
+- Each field can have a description, AI instructions, options (with or without "other"), an expected unit, and a required flag.
+
+Supported import formats:
+
+| Format | Layout |
+|---|---|
+| JSON | `examples/extraction_template.example.json` (canonical). Looser variants such as a flat `fields` list, `name` instead of `label`, or options as `"a; b; c"` are accepted. |
+| Excel (`.xlsx`) | A `fields` sheet with columns such as *Group, Field, Type, Required, Options, Unit, References, Description, Instructions, Repeatable*, plus optional `groups` and `template` sheets. See `examples/extraction_template.example.xlsx`. A blank extraction sheet whose column headers are the fields also works. |
+| CSV | The same columns as the Excel `fields` sheet. |
+
+Templates are saved as immutable versions. Data is stored by group and field ID, so renaming labels is safe. Before saving, the editor shows a structural diff and its impact on existing data. Removed fields keep their values as *archived* values, which stay in the long-format and JSON exports. Papers already marked complete are flagged for re-checking.
+
+### 2. Extract and verify
+
+- **Run AI extraction** for one paper or use **Extract all**. The model receives the template and the full text and returns every value with a status: *reported*, *not reported*, *unclear* or *not applicable*. It also returns the unit, the context needed to interpret numbers (subgroup, dataset, model, metric, setting, table row and column) and verbatim source quotes.
+- Every quote is located in the PDF with the same matcher used for screening evidence. Verified passages are highlighted in violet and keep the exact PDF text.
+- Quotes that cannot be found stay visible as **unverified** and are never highlighted.
+- For numbers, the value must also appear in its cited passage. Otherwise the highlight turns amber and the value is flagged; this catches values read from the wrong table row or column.
+- Click any field to jump to its highlighted passage. Clicking a highlight reveals the field.
+
+### 3. Review and finalise
+
+AI values are **suggestions** until a reviewer acts on them:
+
+- **Accept** (or press `Y` and move to the next suggestion), **Edit** with type validation, **Reject**, or mark *Not reported*, *Unclear* or *Not applicable*.
+- **Accept verified** bulk-accepts only suggestions whose evidence is verified, contains the value and has no issues.
+- Add, rename and remove records in repeatable groups, and attach, remove or restore evidence by selecting text in the PDF.
+- Add notes per field and per paper.
+- Mark the paper's extraction **complete**. You are warned about unreviewed suggestions or missing required fields.
+
+Re-running the AI never overwrites reviewed work:
+
+- Pending suggestions are replaced by the new run.
+- Accepted or edited values are kept. A differing new suggestion is shown beside them for you to adopt or dismiss.
+- Rejected suggestions stay rejected unless the AI proposes something different.
+- Records you removed stay removed.
+
+If a PDF file changes, linked evidence is flagged and can be re-verified against the new file. Paper states are *To extract*, *Awaiting review*, *In review*, *Reviewed* and *Completed*. Without an AI provider, the same form supports fully manual extraction.
+
+### 4. Export
+
+**Export extracted data** downloads a ZIP:
+
+| File | Contents |
+|---|---|
+| `study_level.csv` | One row per paper: single-group fields (`<group>__<field>`, with `__status`, and `__unit`/`__context` for numbers) and record counts |
+| `<group>.csv` | One row per record of each repeatable group, keyed by `record_id` and `paper_id`. Link fields contain the referenced `record_id`s plus labels. |
+| `values_long.csv` | One row per value with status, unit, context, review state, issues, the original AI suggestion, and archived values |
+| `evidence.csv` | Provenance: exact quote, page, verification and value-in-passage check for every source passage |
+| `data_dictionary.csv` | Field definitions and the CSV columns they map to |
+| `extraction.json` / `template.json` | The complete hierarchy (papers → groups → records → values → evidence) and the template |
+
+Exports can be limited to reviewer-confirmed values, or can include papers that are no longer included.
+
 ## Local data, backup, and privacy
 
-The SQLite database stores synced paper metadata, cached extracted text, AI analyses, evidence, notes, and decision history. Use **Settings → Download backup** before upgrades or moving a review. CSV export is available from the top bar.
+The SQLite database stores synced paper metadata, cached extracted text, AI analyses, evidence, notes, decision history, and all extraction data (template versions, records, values, evidence and AI runs). Backups include extraction data; older backups without it can still be restored and leave local extraction work untouched. Use **Settings → Download backup** before upgrades or moving a review. CSV export is available from the top bar.
 
 `.gitignore` excludes credentials, PDFs, the live paper list, criteria, manifests, databases, backups, build output, and virtual environments. Before every public push, still inspect:
 
@@ -269,10 +337,10 @@ The tests create temporary criteria, paper, PDF, and database fixtures; they do 
 ## Project layout
 
 ```text
-app/backend/       FastAPI API, screening rules, storage, PDF extraction, AI providers
-app/frontend/      React, TypeScript, Vite, Tailwind, and PDF.js interface
-app/tests/         Self-contained backend tests
-examples/          Safe criteria, CSV, and manifest templates
+app/backend/       FastAPI API, screening rules, data extraction, storage, PDF text matching, AI providers
+app/frontend/      React, TypeScript, Vite, Tailwind, and PDF.js interface (extraction UI in src/extraction/)
+app/tests/         Self-contained backend tests (screening and extraction)
+examples/          Safe criteria, CSV, manifest and extraction-template examples
 data/              Local optional manifest; ignored except for .gitkeep
 pdfs/              Local full texts; ignored except for .gitkeep
 ```

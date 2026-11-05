@@ -115,7 +115,11 @@ export function useNavigation() {
           return true;
         }
       }
-      if (!opts?.silent) toast.success("All papers have a screening decision 🎉");
+      if (!opts?.silent)
+        toast.success("All papers have a screening decision 🎉", {
+          description: "Included papers are ready for data extraction.",
+          action: { label: "Go to extraction", onClick: () => useUi.getState().setStage("extraction") },
+        });
       return false;
     },
     [all, selectedId, select],
@@ -140,6 +144,7 @@ export function useDecide() {
     onSuccess: (rec, v) => {
       qc.invalidateQueries({ queryKey: ["papers"] });
       qc.invalidateQueries({ queryKey: ["paper", v.id] });
+      qc.invalidateQueries({ queryKey: ["x-papers"] }); // eligibility for extraction follows the decision
       toast.success(`${v.id} → ${DECISION_LABEL[v.decision].toUpperCase()}${rec.code ? ` · ${rec.code}` : ""}`, {
         description: "Decision saved",
         action: {

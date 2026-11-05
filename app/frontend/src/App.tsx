@@ -7,8 +7,13 @@ import { EvidencePanel } from "./components/EvidencePanel";
 import { PaperNavigator } from "./components/PaperNavigator";
 import { MissingPdf, PdfViewer } from "./components/PdfViewer";
 import { Sidebar } from "./components/Sidebar";
-import { TopBar } from "./components/TopBar";
+import { TopBar, type DialogName } from "./components/TopBar";
 import { IconButton, Spinner } from "./components/ui";
+import { ExtractionNavigator } from "./extraction/ExtractionNavigator";
+import { ExtractionPanel, extractionControls } from "./extraction/ExtractionPanel";
+import { AttachEvidenceDialog, ExtractionWorkspace } from "./extraction/ExtractionWorkspace";
+import { useXNavigation, useXPapers } from "./extraction/hooks";
+import { TemplateDialog } from "./extraction/TemplateDialog";
 import { useAnalyze, useNavigation, usePaper, usePapers, useStatus } from "./hooks";
 import { isTypingTarget } from "./lib/format";
 import { viewerControls } from "./lib/pdfjs";
@@ -30,9 +35,12 @@ export default function App() {
   const ui = useUi();
   const { data: papers } = usePapers();
   const { data: status } = useStatus();
+  const { data: xpapers } = useXPapers();
   const { step, nextUnscreened } = useNavigation();
+  const xnav = useXNavigation();
   const analyze = useAnalyze();
-  const [dialog, setDialog] = useState<null | "criteria" | "shortcuts" | "settings">(null);
+  const [dialog, setDialog] = useState<null | DialogName>(null);
+  const extraction = ui.stage === "extraction";
 
   // select something sensible on first load (resume previous paper if it still exists)
   useEffect(() => {
@@ -43,6 +51,18 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [papers?.length]);
+
+  // extraction stage: resume the last paper, otherwise the first included paper that is not completed
+  useEffect(() => {
+    const list = xpapers?.papers;
+    if (!extraction || !list) return;
+    if (!ui.xSelectedId || !list.some((p) => p.paper_id === ui.xSelectedId)) {
+      const eligible = list.filter((p) => p.eligible);
+      const first = eligible.find((p) => p.status !== "completed") ?? eligible[0];
+      if (first) ui.selectExtraction(first.paper_id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraction, xpapers?.papers.length]);
 
   // global keyboard shortcuts
   useEffect(() => {
@@ -56,16 +76,28 @@ export default function App() {
       if (document.querySelector("[role=dialog]")) return;
       const s = useUi.getState();
       const k = e.key;
+      const stageKeys: Record<string, () => void> =
+        s.stage === "extraction"
+          ? {
+              // screening decisions are deliberately not bound here, so they cannot be changed by accident
+              j: () => xnav.step(1),
+              k: () => xnav.step(-1),
+              n: () => xnav.nextOpen(),
+              y: () => extractionControls.acceptActive?.(),
+            }
+          : {
+              i: () => decisionControls.decide?.("include"),
+              e: () => decisionControls.decide?.("exclude"),
+              m: () => decisionControls.decide?.("maybe"),
+              j: () => step(1),
+              k: () => step(-1),
+              n: () => nextUnscreened(),
+              a: () => {
+                if (s.selectedId && status?.ai.available) analyze.mutate({ id: s.selectedId });
+              },
+            };
       const map: Record<string, () => void> = {
-        i: () => decisionControls.decide?.("include"),
-        e: () => decisionControls.decide?.("exclude"),
-        m: () => decisionControls.decide?.("maybe"),
-        j: () => step(1),
-        k: () => step(-1),
-        n: () => nextUnscreened(),
-        a: () => {
-          if (s.selectedId && status?.ai.available) analyze.mutate({ id: s.selectedId });
-        },
+        ...stageKeys,
         h: () => s.set({ showHighlights: !s.showHighlights }),
         g: () => s.set({ showInclude: !s.showInclude, showHighlights: true }),
         r: () => s.set({ showExclude: !s.showExclude, showHighlights: true }),
@@ -77,7 +109,7 @@ export default function App() {
         "+": () => viewerControls.zoomIn?.(),
         "=": () => viewerControls.zoomIn?.(),
         "-": () => viewerControls.zoomOut?.(),
-        "0": () => viewerControls.fitWidth?.(),
+        "0": () => viewerControls.fitPage?.(),
         "?": () => setDialog("shortcuts"),
         Escape: () => s.set({ pendingSelection: null, addEvidenceFor: null }),
       };
@@ -89,23 +121,22 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, nextUnscreened, analyze, status?.ai.available, dialog]);
+  }, [step, nextUnscreened, xnav, analyze, status?.ai.available, dialog]);
 
   return (
     <div className="flex h-full flex-col">
       <TopBar onOpen={setDialog} />
       <div className="flex min-h-0 flex-1">
         <Sidebar side="left" open={ui.leftOpen} width={ui.leftWidth} min={240} max={520} onWidth={(w) => ui.set({ leftWidth: w })}>
-          <PaperNavigator />
+          {extraction ? <ExtractionNavigator /> : <PaperNavigator />}
         </Sidebar>
-        <main className="relative min-w-0 flex-1">
-          <Workspace />
-        </main>
-        <Sidebar side="right" open={ui.rightOpen} width={ui.rightWidth} min={340} max={720} onWidth={(w) => ui.set({ rightWidth: w })}>
-          <EvidencePanel />
+        <main className="relative min-w-0 flex-1">{extraction ? <ExtractionWorkspace onOpenTemplate={() => setDialog("template")} /> : <Workspace />}</main>
+        <Sidebar side="right" open={ui.rightOpen} width={ui.rightWidth} min={340} max={760} onWidth={(w) => ui.set({ rightWidth: w })}>
+          {extraction ? <ExtractionPanel onOpenTemplate={() => setDialog("template")} /> : <EvidencePanel />}
         </Sidebar>
       </div>
-      <AddEvidenceDialog />
+      {extraction ? <AttachEvidenceDialog /> : <AddEvidenceDialog />}
+      <TemplateDialog open={dialog === "template"} onOpenChange={(v) => setDialog(v ? "template" : null)} />
       <ShortcutsDialog open={dialog === "shortcuts"} onOpenChange={(v) => setDialog(v ? "shortcuts" : null)} />
       <CriteriaDialog open={dialog === "criteria"} onOpenChange={(v) => setDialog(v ? "criteria" : null)} />
       <SettingsDialog open={dialog === "settings"} onOpenChange={(v) => setDialog(v ? "settings" : null)} />

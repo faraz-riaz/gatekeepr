@@ -20,6 +20,8 @@ from .config import settings
 from .criteria import criterion_ids
 from .db import Database, dumps, now_iso
 from .export import backup, export_csv, restore
+from .extraction_api import build_router
+from .extraction_service import ExtractionService
 from .papers import pdf_file_path, sync_papers
 from .pdftext import get_index
 from .service import Services
@@ -29,6 +31,7 @@ log = logging.getLogger("screening")
 
 db = Database(settings.db_path)
 svc = Services(db, settings)
+xsvc = ExtractionService(svc)
 
 
 @asynccontextmanager
@@ -45,6 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GateKeepr", lifespan=lifespan)
+app.include_router(build_router(svc, xsvc))
 
 
 def _paper_or_404(paper_id: str) -> dict[str, Any]:

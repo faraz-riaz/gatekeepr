@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "title": "Example: AI model development and evaluation studies",
+  "description": "A reference template showing single groups, repeatable groups and related records. Replace it with the protocol-approved extraction form for your review.",
+  "instructions": "Extract only what the paper reports. Report each dataset, model and result as a separate record.",
+  "groups": [
+    {
+      "id": "study",
+      "label": "Study characteristics",
+      "fields": [
+        {"id": "aim", "label": "Study aim", "type": "long_text", "required": true,
+         "description": "The primary objective of the study in one or two sentences."},
+        {"id": "study_design", "label": "Study design", "type": "categorical", "required": true,
+         "options": ["Model development", "External validation", "Benchmark or comparison", "Deployment or implementation"],
+         "allow_other": true,
+         "instructions": "Classify by the main contribution of the paper."},
+        {"id": "publication_type", "label": "Publication type", "type": "categorical",
+         "options": ["Journal article", "Conference paper", "Preprint"]},
+        {"id": "country", "label": "Country of data collection", "type": "text",
+         "description": "Countries where the study data were collected (not the authors' affiliations)."},
+        {"id": "code_available", "label": "Code availability", "type": "categorical",
+         "options": ["Publicly available", "Available on request", "Not available"],
+         "instructions": "Use 'Not reported' if the paper does not mention code availability."}
+      ]
+    },
+    {
+      "id": "population",
+      "label": "Population",
+      "fields": [
+        {"id": "population_description", "label": "Population", "type": "long_text",
+         "description": "Who the data come from (condition, care setting, inclusion criteria)."},
+        {"id": "n_participants", "label": "Number of participants", "type": "integer", "required": true,
+         "description": "Total number of unique participants/patients across all data used.",
+         "instructions": "Do not confuse participants with recordings or samples."},
+        {"id": "n_samples", "label": "Number of samples / recordings", "type": "integer"},
+        {"id": "age", "label": "Age (mean or median)", "type": "number", "unit": "years",
+         "instructions": "Put the summary statistic (mean/median, SD/IQR) in the context."},
+        {"id": "female_percent", "label": "Female participants", "type": "number", "unit": "%"}
+      ]
+    },
+    {
+      "id": "datasets",
+      "label": "Datasets",
+      "repeatable": true,
+      "record_label": "Dataset",
+      "description": "One record per distinct dataset used in the study.",
+      "fields": [
+        {"id": "name", "label": "Dataset name", "type": "text", "required": true},
+        {"id": "access", "label": "Access", "type": "categorical", "options": ["Public", "Private / institutional", "Mixed"]},
+        {"id": "size", "label": "Size", "type": "integer", "description": "Number of samples or recordings in the dataset as used."},
+        {"id": "role", "label": "Role in the study", "type": "multi_categorical",
+         "options": ["Pretraining", "Training", "Validation", "Internal test", "External test"]}
+      ]
+    },
+    {
+      "id": "models",
+      "label": "Models",
+      "repeatable": true,
+      "record_label": "Model",
+      "description": "One record per model, including proposed models and baselines.",
+      "fields": [
+        {"id": "name", "label": "Model name", "type": "text", "required": true},
+        {"id": "architecture", "label": "Architecture", "type": "text"},
+        {"id": "is_proposed", "label": "Proposed by the authors", "type": "boolean",
+         "description": "True for the authors' own model, false for baselines."},
+        {"id": "parameters", "label": "Number of parameters", "type": "number", "unit": "millions"}
+      ]
+    },
+    {
+      "id": "results",
+      "label": "Results",
+      "repeatable": true,
+      "record_label": "Result",
+      "description": "One record per reported performance value (metric x model x dataset x setting).",
+      "instructions": "For values from tables, quote the table row containing the value and give the row and column headings in the context.",
+      "fields": [
+        {"id": "model", "label": "Model", "type": "reference", "target_group": "models", "required": true},
+        {"id": "dataset", "label": "Dataset", "type": "reference", "target_group": "datasets", "required": true},
+        {"id": "task", "label": "Task", "type": "text"},
+        {"id": "metric", "label": "Metric", "type": "categorical", "required": true,
+         "options": ["AUROC", "AUPRC", "Accuracy", "F1 score", "Sensitivity", "Specificity", "MAE", "RMSE"],
+         "allow_other": true},
+        {"id": "value", "label": "Value", "type": "number", "required": true,
+         "instructions": "The number exactly as reported; give the unit separately and any uncertainty in its own field."},
+        {"id": "uncertainty", "label": "Uncertainty", "type": "text", "description": "95% CI, SD or range as reported."},
+        {"id": "evaluation_setting", "label": "Evaluation setting", "type": "text",
+         "description": "e.g. internal test split, external validation, 5-fold cross-validation, zero-shot."}
+      ]
+    }
+  ]
+}

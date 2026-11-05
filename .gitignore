@@ -46,3 +46,6 @@ npm-debug.log*
 Thumbs.db
 Desktop.ini
 *.swp
+
+# Promotional demo (local only)
+demo/

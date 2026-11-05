@@ -6,6 +6,16 @@ export type Theme = "light" | "dark" | "system";
 export type DecisionFilter = "all" | "unscreened" | "include" | "exclude" | "maybe";
 export type PdfFilter = "all" | "available" | "missing";
 export type AiFilter = "all" | "analysed" | "pending" | "outdated" | "failed" | "suggest_include" | "suggest_exclude" | "suggest_maybe";
+export type Stage = "screening" | "extraction";
+export type ExtractionFilter = "all" | "todo" | "review" | "done" | "attention";
+
+/** Target of a manual evidence selection in the extraction stage. */
+export interface ExtractionEvidenceTarget {
+  group_id: string;
+  field_id: string;
+  record_id?: string | null;
+  label: string;
+}
 
 export interface PendingSelection {
   text: string;
@@ -34,15 +44,24 @@ interface UiState {
   pdfFilter: PdfFilter;
   aiFilter: AiFilter;
   rightTab: "criteria" | "evidence";
+  stage: Stage;
+  xSelectedId: string | null;
+  xFilter: ExtractionFilter;
+  xFieldFilter: "all" | "review" | "issues";
+  /** extraction PDF: show only the passages of the selected field */
+  xFocusHighlights: boolean;
   // session state
   search: string;
   activeEvidenceId: string | null;
   focusNonce: number;
   pendingSelection: PendingSelection | null;
-  addEvidenceFor: { criterionId?: string } | null;
+  addEvidenceFor: { criterionId?: string; extraction?: ExtractionEvidenceTarget } | null;
+  activeValueId: string | null;
 
   set: (patch: Partial<UiState>) => void;
   select: (id: string | null) => void;
+  selectExtraction: (id: string | null) => void;
+  setStage: (stage: Stage) => void;
   focusEvidence: (id: string | null) => void;
 }
 
@@ -65,14 +84,22 @@ export const useUi = create<UiState>()(
       pdfFilter: "all",
       aiFilter: "all",
       rightTab: "criteria",
+      stage: "screening",
+      xSelectedId: null,
+      xFilter: "all",
+      xFieldFilter: "all",
+      xFocusHighlights: false,
       search: "",
       activeEvidenceId: null,
       focusNonce: 0,
       pendingSelection: null,
       addEvidenceFor: null,
+      activeValueId: null,
 
       set: (patch) => set(patch),
       select: (id) => set({ selectedId: id, activeEvidenceId: null, pendingSelection: null, addEvidenceFor: null }),
+      selectExtraction: (id) => set({ xSelectedId: id, activeEvidenceId: null, activeValueId: null, pendingSelection: null, addEvidenceFor: null }),
+      setStage: (stage) => set({ stage, search: "", activeEvidenceId: null, activeValueId: null, pendingSelection: null, addEvidenceFor: null }),
       focusEvidence: (id) => set((s) => ({ activeEvidenceId: id, focusNonce: s.focusNonce + 1 })),
     }),
     {
@@ -94,6 +121,11 @@ export const useUi = create<UiState>()(
         pdfFilter: s.pdfFilter,
         aiFilter: s.aiFilter,
         rightTab: s.rightTab,
+        stage: s.stage,
+        xSelectedId: s.xSelectedId,
+        xFilter: s.xFilter,
+        xFieldFilter: s.xFieldFilter,
+        xFocusHighlights: s.xFocusHighlights,
       }),
     },
   ),

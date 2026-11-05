@@ -22,7 +22,7 @@ export const DOCUMENT_OPTIONS = {
 export const viewerControls: {
   zoomIn?: () => void;
   zoomOut?: () => void;
-  fitWidth?: () => void;
+  fitPage?: () => void;
   nextHighlight?: () => void;
   prevHighlight?: () => void;
   focusSearch?: () => void;

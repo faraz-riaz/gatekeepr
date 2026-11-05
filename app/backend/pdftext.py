@@ -250,7 +250,10 @@ class DocIndex:
     # -- geometry
 
     def span_geometry(self, s: int, e: int) -> tuple[list[list[float]], str]:
-        gids = sorted(set(self.owner[s:e]))
+        owned = self.owner[s:e]
+        # every word between the first and last matched word, including punctuation-only words such as
+        # "±" or "+" that contribute no letters/digits to the matching stream but matter for meaning
+        gids = list(range(min(owned), max(owned) + 1)) if owned else []
         lines: "OrderedDict[tuple[int, int, int], list[float]]" = OrderedDict()
         texts: list[str] = []
         prev = None

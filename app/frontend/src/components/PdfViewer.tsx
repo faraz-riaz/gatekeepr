@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Crosshair,
   Download,
   Ellipsis,
   Eye,
@@ -27,7 +28,7 @@ import { useCriteria } from "../hooks";
 import { cx, POLARITY_LABEL } from "../lib/format";
 import { DOCUMENT_OPTIONS, pdfjsLib, viewerControls, viewerModule, type ViewerModule } from "../lib/pdfjs";
 import { useUi } from "../store";
-import type { Evidence, PaperDetail, Polarity, Rect } from "../types";
+import type { PaperDetail, Polarity, Rect } from "../types";
 import { Button, IconButton, Kbd, Menu, MenuItem, MenuSeparator, Spinner, Tip } from "./ui";
 
 type Viewer = InstanceType<ViewerModule["PDFViewer"]>;
@@ -45,21 +46,96 @@ const ZOOM_PRESETS: [string, string][] = [
   ["3", "300%"],
 ];
 
-const POLARITY_DOT: Record<Polarity, string> = {
+export type HighlightTone = Polarity | "extract" | "mismatch";
+
+/** A passage to highlight, independent of the stage (screening evidence or extracted-value evidence). */
+export interface ViewerHighlight {
+  id: string;
+  page: number;
+  rects: Rect[];
+  tone: HighlightTone;
+  dismissed: boolean;
+  manual: boolean;
+  /** de-emphasised (e.g. extraction passages unrelated to the selected field) */
+  faint?: boolean;
+  kicker: string;
+  title: string;
+  code?: string;
+  detail?: string | null;
+  body?: string | null;
+  meta: string;
+}
+
+const POLARITY_DOT: Record<HighlightTone, string> = {
   include: "bg-emerald-500",
   exclude: "bg-rose-500",
   uncertain: "bg-amber-500",
+  extract: "bg-yellow-400",
+  mismatch: "bg-rose-500",
 };
 
+/** Screening stage: criterion evidence coloured by polarity. */
 export function PdfViewer({ detail }: { detail: PaperDetail }) {
-  const paperId = detail.paper.paper_id;
+  const { map: criteriaMap } = useCriteria();
+  const highlights = useMemo<ViewerHighlight[]>(
+    () =>
+      detail.evidence.map((e) => {
+        const c = criteriaMap[e.criterion_id];
+        return {
+          id: e.id,
+          page: e.page,
+          rects: e.rects,
+          tone: e.polarity,
+          dismissed: e.dismissed,
+          manual: e.origin === "manual",
+          kicker: POLARITY_LABEL[e.polarity],
+          code: e.criterion_id,
+          title: c?.name ?? "Unknown criterion",
+          detail: c && c.definition !== c.name ? c.definition : null,
+          body: e.explanation,
+          meta: [
+            `p. ${e.page}`,
+            e.origin === "manual" ? "Added by reviewer" : "AI · verified in PDF",
+            e.match_method === "fuzzy" && e.match_score != null ? `${Math.round(e.match_score * 100)}% match` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        };
+      }),
+    [detail.evidence, criteriaMap],
+  );
+  const armed = useUi((s) => s.addEvidenceFor?.criterionId);
+  return (
+    <DocumentViewer
+      paperId={detail.paper.paper_id}
+      text={detail.text}
+      highlights={highlights}
+      variant="screening"
+      armedLabel={armed ? `for ${armed}` : ""}
+    />
+  );
+}
+
+export function DocumentViewer({
+  paperId,
+  text,
+  highlights,
+  variant,
+  armedLabel,
+}: {
+  paperId: string;
+  text: PaperDetail["text"];
+  highlights: ViewerHighlight[];
+  variant: "screening" | "extraction";
+  armedLabel: string;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerElRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const inst = useRef<{ mod: ViewerModule; viewer: Viewer; bus: Bus } | null>(null);
   const docRef = useRef<PDFDocumentProxy | null>(null);
-  const preferredScale = useRef("page-width");
+  const preferredScale = useRef("page-fit"); // default zoom: whole page visible
   const numPagesRef = useRef(0);
   const hitMap = useRef(new Map<number, Hit[]>());
 
@@ -70,7 +146,7 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
   const [page, setPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [scale, setScale] = useState(1);
-  const [scaleValue, setScaleValue] = useState("page-width");
+  const [scaleValue, setScaleValue] = useState("page-fit");
   const [findQuery, setFindQuery] = useState("");
   const [findCount, setFindCount] = useState<{ current: number; total: number } | null>(null);
   const [findPending, setFindPending] = useState(false);
@@ -79,24 +155,24 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
   const [fullscreen, setFullscreen] = useState(false);
 
   const ui = useUi();
-  const { map: criteriaMap } = useCriteria();
-  const evidence = detail.evidence;
+  const evidence = highlights;
+  const screening = variant === "screening";
 
   const visible = useMemo(() => {
     return evidence.filter((e) => {
       if (e.id === ui.activeEvidenceId) return true; // the focused passage is always shown
       if (!ui.showHighlights) return false;
       if (e.dismissed && !ui.showDismissed) return false;
-      if (e.polarity === "include" && !ui.showInclude) return false;
-      if (e.polarity === "exclude" && !ui.showExclude) return false;
-      if (e.polarity === "uncertain" && !ui.showUncertain) return false;
+      if (screening && e.tone === "include" && !ui.showInclude) return false;
+      if (screening && e.tone === "exclude" && !ui.showExclude) return false;
+      if (screening && e.tone === "uncertain" && !ui.showUncertain) return false;
       return true;
     });
-  }, [evidence, ui.showHighlights, ui.showDismissed, ui.showInclude, ui.showExclude, ui.showUncertain, ui.activeEvidenceId]);
+  }, [evidence, screening, ui.showHighlights, ui.showDismissed, ui.showInclude, ui.showExclude, ui.showUncertain, ui.activeEvidenceId]);
 
   const counts = useMemo(() => {
-    const c: Record<Polarity, number> = { include: 0, exclude: 0, uncertain: 0 };
-    for (const e of evidence) if (!e.dismissed) c[e.polarity]++;
+    const c: Record<HighlightTone, number> = { include: 0, exclude: 0, uncertain: 0, extract: 0, mismatch: 0 };
+    for (const e of evidence) if (!e.dismissed) c[e.tone]++;
     return c;
   }, [evidence]);
 
@@ -155,9 +231,10 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
         const d = document.createElement("div");
         d.className = cx(
           "hl",
-          e.dismissed ? "dismissed" : e.polarity,
-          e.origin === "manual" && "manual",
-          activeRef.current === e.id && cx("active", e.polarity),
+          e.dismissed ? "dismissed" : e.tone,
+          e.manual && "manual",
+          e.faint && activeRef.current !== e.id && "faint",
+          activeRef.current === e.id && cx("active", e.tone),
           hoverRef.current === e.id && "hover",
         );
         d.style.left = `${l}%`;
@@ -357,7 +434,7 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
     (dir: 1 | -1) => {
       if (!ordered.length) return;
       const i = ordered.findIndex((e) => e.id === useUi.getState().activeEvidenceId);
-      let next: Evidence | undefined;
+      let next: ViewerHighlight | undefined;
       if (i >= 0) next = ordered[(i + dir + ordered.length) % ordered.length];
       else next = dir > 0 ? ordered.find((e) => e.page >= page) ?? ordered[0] : [...ordered].reverse().find((e) => e.page <= page) ?? ordered[ordered.length - 1];
       if (next) useUi.getState().focusEvidence(next.id);
@@ -368,7 +445,7 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
   useEffect(() => {
     viewerControls.zoomIn = () => zoomBy(1);
     viewerControls.zoomOut = () => zoomBy(-1);
-    viewerControls.fitWidth = () => setZoom("page-width");
+    viewerControls.fitPage = () => setZoom("page-fit");
     viewerControls.nextHighlight = () => stepHighlight(1);
     viewerControls.prevHighlight = () => stepHighlight(-1);
     viewerControls.focusSearch = () => {
@@ -529,7 +606,7 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
           {ZOOM_PRESETS.map(([v, l], i) => (
             <div key={v}>
               {i === 2 && <MenuSeparator />}
-              <MenuItem onSelect={() => setZoom(v)} hint={v === "page-width" ? "0" : undefined}>
+              <MenuItem onSelect={() => setZoom(v)} hint={v === "page-fit" ? "0" : undefined}>
                 {l}
               </MenuItem>
             </div>
@@ -589,9 +666,29 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
           <IconButton label={ui.showHighlights ? "Hide all highlights" : "Show all highlights"} kbd="H" active={!ui.showHighlights} onClick={() => ui.set({ showHighlights: !ui.showHighlights })}>
             {ui.showHighlights ? <Eye size={16} /> : <EyeOff size={16} />}
           </IconButton>
-          <LegendToggle label="Supports inclusion" kbd="G" polarity="include" count={counts.include} on={ui.showInclude && ui.showHighlights} onClick={() => ui.set({ showInclude: !ui.showInclude })} />
-          <LegendToggle label="Supports exclusion" kbd="R" polarity="exclude" count={counts.exclude} on={ui.showExclude && ui.showHighlights} onClick={() => ui.set({ showExclude: !ui.showExclude })} />
-          <LegendToggle label="Ambiguous / uncertain" kbd="U" polarity="uncertain" count={counts.uncertain} on={ui.showUncertain && ui.showHighlights} onClick={() => ui.set({ showUncertain: !ui.showUncertain })} />
+          {screening ? (
+            <>
+              <LegendToggle label="Supports inclusion" kbd="G" polarity="include" count={counts.include} on={ui.showInclude && ui.showHighlights} onClick={() => ui.set({ showInclude: !ui.showInclude })} />
+              <LegendToggle label="Supports exclusion" kbd="R" polarity="exclude" count={counts.exclude} on={ui.showExclude && ui.showHighlights} onClick={() => ui.set({ showExclude: !ui.showExclude })} />
+              <LegendToggle label="Ambiguous / uncertain" kbd="U" polarity="uncertain" count={counts.uncertain} on={ui.showUncertain && ui.showHighlights} onClick={() => ui.set({ showUncertain: !ui.showUncertain })} />
+            </>
+          ) : (
+            <>
+              <Tip content="Verified source passages of extracted values">
+                <span className="flex h-7 items-center gap-1.5 px-1.5 text-[12px] font-medium tabular-nums text-ink-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-yellow-400 ring-1 ring-yellow-600/40" />
+                  <span className="hidden @xl:inline">{counts.extract + counts.mismatch}</span>
+                </span>
+              </Tip>
+              <IconButton
+                label={ui.xFocusHighlights ? "Show all source passages" : "Show only the selected field's passages"}
+                active={ui.xFocusHighlights}
+                onClick={() => ui.set({ xFocusHighlights: !ui.xFocusHighlights })}
+              >
+                <Crosshair size={15} />
+              </IconButton>
+            </>
+          )}
           <IconButton label="Previous highlight" kbd="," onClick={() => stepHighlight(-1)} disabled={!ordered.length}>
             <ChevronUp size={16} />
           </IconButton>
@@ -628,15 +725,15 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
       </div>
       </div>
 
-      {detail.text && detail.text.status !== "ok" && detail.text.message && (
+      {text && text.status !== "ok" && text.message && (
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[12px] text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-          <TriangleAlert size={13} /> {detail.text.message}
+          <TriangleAlert size={13} /> {text.message}
         </div>
       )}
       {ui.addEvidenceFor && !ui.pendingSelection && (
         <div className="flex items-center gap-2 border-b border-accent/20 bg-accent-soft px-3 py-1.5 text-[12.5px] text-ink">
           <Highlighter size={14} className="text-accent" />
-          Select the passage in the PDF to add as evidence{ui.addEvidenceFor.criterionId ? ` for ${ui.addEvidenceFor.criterionId}` : ""}.
+          Select the passage in the PDF to add as evidence{armedLabel ? ` ${armedLabel}` : ""}.
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => ui.set({ addEvidenceFor: null })}>
             Cancel
           </Button>
@@ -677,9 +774,19 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
         {/* legend */}
         {loadState === "ready" && evidence.length > 0 && ui.showHighlights && (
           <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-3 rounded-full border border-line bg-surface/90 px-3 py-1 text-[11px] text-ink-2 shadow-sm backdrop-blur">
-            <LegendSwatch cls="bg-emerald-500/40 border-b-2 border-emerald-600" label="Supports inclusion" />
-            <LegendSwatch cls="bg-rose-500/40 border-b-2 border-rose-600" label="Supports exclusion" />
-            <LegendSwatch cls="bg-amber-400/40 border-b-2 border-amber-600" label="Ambiguous" />
+            {screening ? (
+              <>
+                <LegendSwatch cls="bg-emerald-500/40 border-b-2 border-emerald-600" label="Supports inclusion" />
+                <LegendSwatch cls="bg-rose-500/40 border-b-2 border-rose-600" label="Supports exclusion" />
+                <LegendSwatch cls="bg-amber-400/40 border-b-2 border-amber-600" label="Ambiguous" />
+              </>
+            ) : (
+              <>
+                <LegendSwatch cls="bg-yellow-300/70 border-b-[1.5px] border-yellow-600" label="Source passage" />
+                <LegendSwatch cls="bg-yellow-200/40" label="Other fields" />
+                <LegendSwatch cls="bg-rose-400/25 border-b-2 border-dashed border-rose-600" label="Value not in passage" />
+              </>
+            )}
             <LegendSwatch cls="bg-stone-300/60 bg-[repeating-linear-gradient(135deg,transparent_0_3px,rgba(255,255,255,.7)_3px_5px)]" label="Manual" />
           </div>
         )}
@@ -692,9 +799,9 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
               variant="primary"
               className="shadow-lg"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => ui.set({ addEvidenceFor: { criterionId: ui.addEvidenceFor?.criterionId } })}
+              onClick={() => ui.set({ addEvidenceFor: { ...(ui.addEvidenceFor ?? {}) } })}
             >
-              <Plus size={13} /> Add as evidence
+              <Plus size={13} /> {variant === "extraction" ? "Attach as source" : "Add as evidence"}
             </Button>
           </div>
         )}
@@ -706,7 +813,6 @@ export function PdfViewer({ detail }: { detail: PaperDetail }) {
           x={tipPos.x}
           y={tipPos.y}
           pinned={!!pinned}
-          criterion={criteriaMap[tipEvidence.criterion_id]}
           onClose={() => setPinned(null)}
         />
       )}
@@ -727,7 +833,7 @@ function LegendSwatch({ cls, label }: { cls: string; label: string }) {
   );
 }
 
-function LegendToggle({ label, kbd, polarity, count, on, onClick }: { label: string; kbd: string; polarity: Polarity; count: number; on: boolean; onClick: () => void }) {
+function LegendToggle({ label, kbd, polarity, count, on, onClick }: { label: string; kbd: string; polarity: HighlightTone; count: number; on: boolean; onClick: () => void }) {
   return (
     <Tip content={`${on ? "Hide" : "Show"} ${label.toLowerCase()} highlights`} kbd={kbd}>
       <button
@@ -745,21 +851,7 @@ function LegendToggle({ label, kbd, polarity, count, on, onClick }: { label: str
   );
 }
 
-function HighlightTip({
-  e,
-  x,
-  y,
-  pinned,
-  criterion,
-  onClose,
-}: {
-  e: Evidence;
-  x: number;
-  y: number;
-  pinned: boolean;
-  criterion?: { id: string; name: string; definition: string; parent: string | null };
-  onClose: () => void;
-}) {
+function HighlightTip({ e, x, y, pinned, onClose }: { e: ViewerHighlight; x: number; y: number; pinned: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x + 14, top: y + 14 });
   useEffect(() => {
@@ -772,7 +864,7 @@ function HighlightTip({
       top: y + 14 + h > window.innerHeight - 8 ? Math.max(8, y - h - 14) : y + 14,
     });
   }, [x, y, e.id]);
-  const tone = e.dismissed ? "text-ink-3" : e.polarity === "include" ? "text-emerald-600 dark:text-emerald-400" : e.polarity === "exclude" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
+  const tone = e.dismissed ? "text-ink-3" : TONE_TEXT[e.tone];
   return (
     <div
       ref={ref}
@@ -781,15 +873,15 @@ function HighlightTip({
       onMouseDown={(ev) => ev.stopPropagation()}
     >
       <div className="flex items-start gap-2">
-        <span className={cx("mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full", e.dismissed ? "bg-stone-400" : POLARITY_DOT[e.polarity])} />
+        <span className={cx("mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full", e.dismissed ? "bg-stone-400" : POLARITY_DOT[e.tone])} />
         <div className="min-w-0 flex-1">
           <div className={cx("text-[11px] font-semibold uppercase tracking-wide", tone)}>
             {e.dismissed ? "Dismissed · " : ""}
-            {POLARITY_LABEL[e.polarity]}
+            {e.kicker}
           </div>
           <div className="mt-0.5 font-medium text-ink">
-            <span className="mr-1 font-mono text-[11.5px] text-ink-2">{e.criterion_id}</span>
-            {criterion?.name ?? "Unknown criterion"}
+            {e.code && <span className="mr-1 font-mono text-[11.5px] text-ink-2">{e.code}</span>}
+            <span className="whitespace-pre-line">{e.title}</span>
           </div>
         </div>
         {pinned && (
@@ -798,24 +890,32 @@ function HighlightTip({
           </button>
         )}
       </div>
-      {criterion && criterion.definition !== criterion.name && (
-        <p className="mt-2 line-clamp-3 border-l-2 border-line pl-2 text-[11.5px] leading-snug text-ink-3">{criterion.definition}</p>
-      )}
-      {e.explanation && <p className="mt-2 leading-snug text-ink-2">{e.explanation}</p>}
-      <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3">
-        <span>p. {e.page}</span>·<span>{e.origin === "manual" ? "Added by reviewer" : "AI · verified in PDF"}</span>
-        {e.match_method === "fuzzy" && e.match_score != null && <span>· {Math.round(e.match_score * 100)}% match</span>}
-      </div>
+      {e.detail && <p className="mt-2 line-clamp-3 border-l-2 border-line pl-2 text-[11.5px] leading-snug text-ink-3">{e.detail}</p>}
+      {e.body && <p className="mt-2 leading-snug text-ink-2">{e.body}</p>}
+      <div className="mt-2 text-[11px] text-ink-3">{e.meta}</div>
       {!pinned && (
         <div className="mt-1.5 text-[10.5px] text-ink-3">
-          Click to pin · details in the evidence panel <Kbd className="ml-1">.</Kbd>
+          Click to pin · details in the side panel <Kbd className="ml-1">.</Kbd>
         </div>
       )}
     </div>
   );
 }
 
-export function MissingPdf({ detail }: { detail: PaperDetail }) {
+const TONE_TEXT: Record<HighlightTone, string> = {
+  include: "text-emerald-600 dark:text-emerald-400",
+  exclude: "text-rose-600 dark:text-rose-400",
+  uncertain: "text-amber-600 dark:text-amber-400",
+  extract: "text-amber-700 dark:text-yellow-400",
+  mismatch: "text-rose-600 dark:text-rose-400",
+};
+
+type MissingPdfPaper = Pick<
+  PaperDetail["paper"],
+  "paper_id" | "doi" | "landing_page_url" | "pdf_url" | "link" | "pmcid" | "access_status" | "manifest_notes"
+>;
+
+export function MissingPdf({ detail, stage = "screening" }: { detail: { paper: MissingPdfPaper }; stage?: "screening" | "extraction" }) {
   const p = detail.paper;
   const links = [
     p.doi && { label: `DOI: ${p.doi}`, href: `https://doi.org/${p.doi}` },
@@ -839,7 +939,7 @@ export function MissingPdf({ detail }: { detail: PaperDetail }) {
               (status: <span className="font-medium">{p.access_status}</span>)
             </>
           ) : null}
-          . No other document is substituted. AI analysis requires the full text.
+          . No other document is substituted. {stage === "extraction" ? "AI extraction needs the full text, but you can still enter values manually in the panel." : "AI analysis requires the full text."}
         </p>
         {p.manifest_notes && <p className="mt-3 rounded-lg bg-surface-3 p-3 text-[12.5px] leading-relaxed text-ink-2">{p.manifest_notes}</p>}
         {links.length > 0 && (
@@ -852,7 +952,7 @@ export function MissingPdf({ detail }: { detail: PaperDetail }) {
             ))}
           </div>
         )}
-        <p className="mt-4 text-[12px] text-ink-3">
+        <p className={cx("mt-4 text-[12px] text-ink-3", stage === "extraction" && "hidden")}>
           If the full text cannot be obtained, you can record the paper as <span className="font-medium text-ink-2">U1 — Not retrieved</span> using the decision
           panel. After adding a PDF named <span className="font-mono">&lt;Paper_ID&gt;.pdf</span> to <span className="font-mono">pdfs/</span>, use “Re-sync sources”.
         </p>
