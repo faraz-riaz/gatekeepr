@@ -347,4 +347,4 @@ pdfs/              Local full texts; ignored except for .gitkeep
 
 ## Licence
 
-No open-source licence has been selected yet. Choose and add a licence before advertising reuse or accepting contributions.
+GateKeepr is released under the [MIT License](LICENSE).
